@@ -1,48 +1,81 @@
 """
-Database Schemas
+Database Schemas for TouristTable
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model below maps to a MongoDB collection using the lowercase
+name of the class. Example: class Restaurant -> "restaurant" collection.
 """
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field, EmailStr
 
-from pydantic import BaseModel, Field
-from typing import Optional
+# Core domain models
 
-# Example schemas (replace with your own):
+class Owner(BaseModel):
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    languages: List[str] = Field(default_factory=lambda: ["sq", "en"])  # supported languages
+    is_active: bool = True
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+class Restaurant(BaseModel):
+    owner_id: Optional[str] = Field(None, description="Reference to owner _id as string")
+    name: str
+    address: str
+    city: str = Field(..., description="City in Albania")
+    cuisine: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    avg_rating: float = 0.0
+    price_level: Optional[Literal[1,2,3,4]] = None  # 1=budget, 4=luxury
+    menu: List[dict] = Field(default_factory=list, description="List of menu items with translations")
+    images: List[str] = Field(default_factory=list)
+    accepts_reservations: bool = True
+    tourist_discounts: List[dict] = Field(default_factory=list)  # [{code, description, percent}]
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Review(BaseModel):
+    restaurant_id: str
+    user_name: str
+    user_country: Optional[str] = None
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    is_trusted: bool = True  # for MVP, assume phone/email verified off-platform
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Event(BaseModel):
+    title: str
+    city: str
+    date: str  # ISO date string for simplicity
+    description: Optional[str] = None
+    category: Literal['festival','food','music','culture','other'] = 'food'
+    venue: Optional[str] = None
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Reservation(BaseModel):
+    restaurant_id: str
+    name: str
+    email: EmailStr
+    party_size: int = Field(..., ge=1)
+    date_time: str
+    status: Literal['confirmed','pending','waitlist'] = 'pending'
+    notes: Optional[str] = None
+
+class Campaign(BaseModel):
+    restaurant_id: str
+    name: str
+    message: str
+    target_cuisines: List[str] = Field(default_factory=list)
+    target_cities: List[str] = Field(default_factory=list)
+    budget_eur: Optional[float] = None
+    active: bool = True
+
+class Discount(BaseModel):
+    restaurant_id: str
+    code: str
+    description: Optional[str] = None
+    percent: float = Field(..., ge=0, le=100)
+    active: bool = True
+
+# Public schema endpoint helper
+class SchemaInfo(BaseModel):
+    collections: List[str]
+"""
+Note: The Flames database viewer may read these via GET /schema endpoint.
+"""
